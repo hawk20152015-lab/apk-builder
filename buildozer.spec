@@ -1,11 +1,11 @@
 [app]
-title = رصيد الإجازات والدوام
+title = الإجازات والدوام
 package.name = leaveapp
 package.domain = org.omarkarim
 source.dir = .
-source.include_exts = py,png
+source.include_exts = py,png,html
 source.exclude_dirs = .git,.github,bin,.buildozer,__pycache__
-version = 2.0
+version = 3.0
 
 requirements = python3,flask,werkzeug,jinja2,itsdangerous,click,markupsafe,blinker
 

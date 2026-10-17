@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>نظام إدارة الاجازات والدوام</title>
+<style>
+:root{
+  --canvas:#eef2f7; --surface:#fff; --ink:#0f172a; --muted:#64748b; --line:#e2e8f0;
+  --slate:#1e293b; --slate2:#334155; --accent:#4f46e5; --accent2:#7c3aed;
+  --teal:#0d9488; --amber:#d97706; --rose:#be123c;
+  --s-duty:#dcfce7; --s-duty-i:#15803d; --s-off:#e2e8f0; --s-off-i:#475569;
+  --s-leave:#fee2e2; --s-leave-i:#b91c1c; --s-hol:#fef3c7; --s-hol-i:#b45309;
+  --r:16px; --nav:64px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{background:var(--canvas);color:var(--ink);font-family:"Noto Sans Arabic","Noto Naskh Arabic",Tahoma,"Segoe UI",sans-serif;font-size:15px;overscroll-behavior:none}
+button,input,select{font:inherit}
+.hidden{display:none!important}
+
+/* ---------- قفل ---------- */
+#lock{position:fixed;inset:0;background:radial-gradient(120% 80% at 50% 0%,#312e81 0%,var(--slate) 55%,#0f172a 100%);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;z-index:50}
+#lock .ico{width:72px;height:72px;border-radius:22px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;box-shadow:0 12px 30px #4f46e566}
+#lock h1{font-size:20px;margin:18px 0 4px}
+#lock p{margin:0;color:#94a3b8;font-size:13px}
+.dots{display:flex;gap:14px;margin:26px 0 8px;direction:ltr}
+.dots i{width:14px;height:14px;border-radius:50%;border:2px solid #64748b;transition:.15s}
+.dots i.on{background:#fff;border-color:#fff}
+#lockMsg{min-height:20px;color:#fca5a5;font-size:13px;font-weight:700}
+.pad{display:grid;grid-template-columns:repeat(3,72px);gap:14px;margin-top:10px;direction:ltr}
+.pad button{height:72px;border-radius:50%;border:0;background:#ffffff14;color:#fff;font-size:26px;font-weight:600}
+.pad button:active{background:#ffffff33}
+.pad .ok{background:var(--accent);font-size:16px;font-weight:700}
+#lock .mark{position:absolute;bottom:22px;color:#64748b;font-size:12px;font-weight:700}
+
+/* ---------- الإطار ---------- */
+header{position:sticky;top:0;z-index:10;background:linear-gradient(135deg,var(--slate) 0%,#312e81 100%);color:#fff;padding:14px 16px 12px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 10px #0003}
+header .t{flex:1;min-width:0}
+header h1{margin:0;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header small{color:#a5b4fc;font-size:12px}
+.hbtn{width:40px;height:40px;border-radius:12px;border:0;background:#ffffff1a;color:#fff;display:grid;place-items:center}
+.hbtn:active{background:#ffffff33}
+main{padding:14px 14px calc(var(--nav) + 70px)}
+nav{position:fixed;bottom:0;left:0;right:0;height:var(--nav);background:#fff;border-top:1px solid var(--line);display:flex;z-index:10;box-shadow:0 -4px 16px #0f172a10}
+nav button{flex:1;border:0;background:none;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:700;padding:0}
+nav button svg{width:22px;height:22px}
+nav button.on{color:var(--accent)}
+nav button.on svg{background:#eef2ff;border-radius:10px;padding:3px;width:30px;height:28px}
+.credit{text-align:center;color:var(--muted);font-size:12px;font-weight:700;margin-top:18px}
+
+/* ---------- عناصر ---------- */
+.sec-h{display:flex;align-items:flex-end;justify-content:space-between;margin:2px 2px 10px}
+.sec-h h2{margin:0;font-size:18px}
+.sec-h p{margin:2px 0 0;color:var(--muted);font-size:12px}
+.card{background:var(--surface);border-radius:var(--r);padding:14px;box-shadow:0 1px 3px #0f172a12,0 1px 2px #0f172a0a;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:12px}
+.av{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:17px;flex:none}
+.grow{flex:1;min-width:0}
+.name{font-weight:800;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{color:var(--muted);font-size:13px;margin-top:2px}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:800;white-space:nowrap}
+.c-am{background:#fef3c7;color:#92400e}.c-pm{background:#e0e7ff;color:#3730a3}
+.st-duty{background:var(--s-duty);color:var(--s-duty-i)}
+.st-off,.st-wk{background:var(--s-off);color:var(--s-off-i)}
+.st-leave{background:var(--s-leave);color:var(--s-leave-i)}
+.st-hol{background:var(--s-hol);color:var(--s-hol-i)}
+.acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.btn{border:0;border-radius:12px;padding:10px 14px;font-weight:800;font-size:14px;color:#fff;background:var(--accent);display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn:active{filter:brightness(.9)}
+.btn.sm{padding:7px 12px;font-size:13px;border-radius:10px}
+.btn.teal{background:var(--teal)}.btn.amber{background:var(--amber)}.btn.rose{background:var(--rose)}
+.btn.ghost{background:#f1f5f9;color:var(--slate2)}
+.btn.block{width:100%;padding:13px}
+.fab{position:fixed;left:18px;bottom:calc(var(--nav) + 16px);width:58px;height:58px;border-radius:18px;border:0;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 10px 24px #4f46e566;display:grid;place-items:center;z-index:9}
+.fab:active{transform:scale(.95)}
+.empty{text-align:center;color:var(--muted);padding:38px 16px}
+.empty svg{width:46px;height:46px;opacity:.35;display:block;margin:0 auto 8px}
+.kv{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-top:8px}
+.kv b{color:var(--ink)}
+.pair{display:flex;align-items:stretch;gap:8px;margin-top:10px}
+.pair>div{flex:1;background:#f8fafc;border-radius:12px;padding:10px;text-align:center}
+.pair .n{font-weight:800;font-size:14px;margin-bottom:6px}
+.swap{align-self:center;color:var(--accent2)}
+
+/* ---------- حقول ---------- */
+label.f{display:block;margin-bottom:12px}
+label.f span{display:block;font-size:13px;font-weight:800;color:var(--slate2);margin-bottom:6px}
+.in{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:12px;background:#f8fafc;color:var(--ink);font-size:15px;outline:none;appearance:none}
+.in:focus{border-color:var(--accent);background:#fff}
+select.in{background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:16px 52%,22px 52%;background-size:6px 6px;background-repeat:no-repeat;padding-left:34px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.seg{display:flex;background:#f1f5f9;border-radius:12px;padding:4px;gap:4px}
+.seg button{flex:1;border:0;background:none;border-radius:9px;padding:9px;font-weight:800;color:var(--muted)}
+.seg button.on{background:#fff;color:var(--accent);box-shadow:0 1px 3px #0002}
+.hint{font-size:12px;color:var(--muted);background:#f8fafc;border-radius:10px;padding:10px;margin-bottom:12px;line-height:1.7}
+
+/* ---------- نافذة ---------- */
+#sheetBg{position:fixed;inset:0;background:#0f172a80;z-index:30;opacity:0;pointer-events:none;transition:.2s}
+#sheetBg.on{opacity:1;pointer-events:auto}
+#sheet{position:fixed;left:0;right:0;bottom:0;max-height:90%;overflow:auto;background:#fff;border-radius:22px 22px 0 0;z-index:31;transform:translateY(105%);transition:transform .25s ease,visibility 0s .25s;visibility:hidden;padding:8px 16px 22px}
+#sheet.on{transform:none;visibility:visible;transition:transform .25s ease}
+#sheet .grab{width:42px;height:5px;border-radius:9px;background:#cbd5e1;margin:4px auto 12px}
+#sheet h3{margin:0 0 14px;font-size:18px}
+#toast{position:fixed;left:50%;bottom:calc(var(--nav) + 90px);transform:translateX(-50%) translateY(20px);background:var(--slate);color:#fff;padding:11px 18px;border-radius:12px;font-weight:700;font-size:14px;opacity:0;transition:.2s;z-index:40;max-width:88%;text-align:center;pointer-events:none}
+#toast.on{opacity:1;transform:translateX(-50%)}
+#toast.bad{background:var(--rose)}
+
+/* ---------- جدول الدوام ---------- */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:10px}
+.cal .h{font-size:11px;color:var(--muted);text-align:center;font-weight:800;padding:2px 0}
+.cal .d{aspect-ratio:1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;font-size:14px;position:relative}
+.cal .d small{font-size:9px;font-weight:700;opacity:.85}
+.cal .d.today{outline:2.5px solid var(--accent);outline-offset:1px}
+.d.st-wk{background:#f8fafc;color:#94a3b8}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:12px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:4px;vertical-align:-2px;margin-left:4px}
+.mnav{display:flex;align-items:center;gap:8px}
+.mnav .lbl{flex:1;text-align:center;font-weight:800;font-size:16px}
+.mnav button{width:42px;height:42px;border-radius:12px;border:0;background:#eef2ff;color:var(--accent);display:grid;place-items:center}
+.daylist .it{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+.daylist .it:last-child{border:0}
+.daylist .dt{width:74px;color:var(--muted);font-size:12px}
+
+/* ---------- تقارير ---------- */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.stat{background:#fff;border-radius:14px;padding:12px 8px;text-align:center;box-shadow:0 1px 3px #0f172a12;border-top:4px solid var(--c)}
+.stat b{display:block;font-size:24px;color:var(--c);line-height:1.2}
+.stat span{font-size:11px;color:var(--muted);font-weight:800}
+.eq{display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px;font-weight:800;color:var(--slate2);background:#fff;border-radius:12px;padding:10px;margin-bottom:10px;flex-wrap:wrap}
+.eq .op{color:var(--muted)}
+.mini{width:100%;border-collapse:collapse;font-size:13px}
+.mini th{background:var(--slate);color:#fff;padding:8px 6px;font-weight:700}
+.mini th:first-child{border-radius:0 10px 0 0}.mini th:last-child{border-radius:10px 0 0 0}
+.mini td{padding:9px 6px;text-align:center;border-bottom:1px solid var(--line)}
+.mini tr:nth-child(even) td{background:#f8fafc}
+</style>
+</head>
+<body>
+
+<!-- ====================== القفل ====================== -->
+<div id="lock">
+  <div class="ico"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
+  <h1>نظام إدارة الاجازات والدوام</h1>
+  <p>أدخل الرمز السري للدخول</p>
+  <div class="dots" id="dots"></div>
+  <div id="lockMsg"></div>
+  <div class="pad" id="pad"></div>
+  <div class="mark" id="lockMark"></div>
+</div>
+
+<!-- ====================== التطبيق ====================== -->
+<header>
+  <div class="t"><h1 id="title">الموظفون</h1><small id="today"></small></div>
+  <button class="hbtn" onclick="pinSheet()" aria-label="تغيير الرمز"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M15 8l2 2"/></svg></button>
+  <button class="hbtn" style="background:#be123c" onclick="lockNow()" aria-label="قفل"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></button>
+</header>
+<main id="main"></main>
+<button class="fab hidden" id="fab"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+<nav id="nav"></nav>
+
+<div id="sheetBg" onclick="closeSheet()"></div>
+<div id="sheet"><div class="grab"></div><div id="sheetBody"></div></div>
+<div id="toast"></div>
+
+<script>
+// ============================================================ أدوات
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const AR_MONTHS = ['كانون الثاني','شباط','آذار','نيسان','أيار','حزيران','تموز','آب','أيلول','تشرين الأول','تشرين الثاني','كانون الأول'];
+const COLORS = ['#4f46e5','#0d9488','#d97706','#be123c','#7c3aed','#0284c7','#16a34a','#db2777'];
+let S = null;              // الحالة من الخادم
+let TAB = 'emp';
+const view = {sched:null, rep:null};
+
+async function api(path, data){
+  const opt = data === undefined ? {} : {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)};
+  try{
+    const r = await fetch(path, opt);
+    return await r.json();
+  }catch(e){ return {ok:false, error:'تعذر الاتصال'}; }
+}
+function toast(msg, bad){
+  const t = $('#toast'); t.textContent = msg; t.className = 'on' + (bad ? ' bad' : '');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.className = bad ? 'bad' : '', 2400);
+}
+async function act(path, data, after){
+  const r = await api(path, data ?? {});
+  if(!r.ok){ toast(r.error || 'حدث خطأ', true); return false; }
+  if(r.msg) toast(r.msg);
+  await load(); if(after) after(r); return true;
+}
+function confirmBox(title, text, okText, onOk){
+  openSheet(`<h3>${esc(title)}</h3><p style="color:var(--muted);margin:0 0 18px;line-height:1.8">${esc(text)}</p>
+    <div class="two"><button class="btn ghost block" onclick="closeSheet()">إلغاء</button>
+    <button class="btn rose block" id="cOk">${esc(okText || 'حذف')}</button></div>`);
+  $('#cOk').onclick = () => { closeSheet(); onOk(); };
+}
+function openSheet(html){ $('#sheetBody').innerHTML = html; $('#sheet').classList.add('on'); $('#sheetBg').classList.add('on'); }
+function closeSheet(){ $('#sheet').classList.remove('on'); $('#sheetBg').classList.remove('on'); }
+const empById = id => S.employees.find(e => e.id == id);
+const avatar = (name, id) => `<div class="av" style="background:${COLORS[id % COLORS.length]}">${esc((name||'?').trim()[0])}</div>`;
+const shiftChip = s => s === 'صباحي' ? `<span class="chip c-am">☀ صباحي</span>` : `<span class="chip c-pm">☾ خفر</span>`;
+const ST = {'دوام':'duty','نزول':'off','إجازة':'leave','عطلة رسمية':'hol','عطلة أسبوعية':'wk'};
+const stChip = s => s ? `<span class="chip st-${ST[s] || 'off'}">${esc(s)}</span>` : '<span class="chip st-off">—</span>';
+const ICON = {
+  emp:'<path d="M16 19v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1"/><circle cx="9" cy="7" r="3.5"/><path d="M22 19v-1a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+  rot:'<path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+  lv:'<path d="M3 21h18M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/>',
+  hol:'<path d="M12 2l2.9 6.2 6.6.6-5 4.5 1.5 6.6L12 16.5 6 19.9l1.5-6.6-5-4.5 6.6-.6z"/>',
+  sched:'<rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  rep:'<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-6"/>',
+};
+const svg = (k, cls) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${cls||''}>${ICON[k]}</svg>`;
+const empty = (k, t) => `<div class="empty">${svg(k)}${esc(t)}</div>`;
+const ymd = d => d.toISOString().slice(0,10);
+
+// ============================================================ القفل
+let pin = '', tries = 0;
+function buildLock(){
+  $('#dots').innerHTML = '<i></i>'.repeat(4);
+  const keys = ['1','2','3','4','5','6','7','8','9','⌫','0','دخول'];
+  $('#pad').innerHTML = keys.map(k => `<button class="${k==='دخول'?'ok':''}" data-k="${k}">${k}</button>`).join('');
+  $('#pad').onclick = e => { const k = e.target.dataset.k; if(!k) return;
+    if(k === '⌫') pin = pin.slice(0,-1); else if(k === 'دخول') return tryPin(); else if(pin.length < 12) pin += k;
+    drawDots(); if(pin.length >= 4 && k !== '⌫' && !tryPin._busy) tryPin(true); };
+  drawDots();
+}
+function drawDots(){
+  const n = Math.max(4, pin.length);
+  $('#dots').innerHTML = Array.from({length:n}, (_, i) => `<i class="${i < pin.length ? 'on' : ''}"></i>`).join('');
+}
+async function tryPin(auto){
+  if(!pin) return;
+  tryPin._busy = true;
+  const r = await api('/api/login', {pin});
+  tryPin._busy = false;
+  if(r.ok){ pin = ''; tries = 0; $('#lockMsg').textContent = ''; drawDots(); $('#lock').classList.add('hidden'); await load(); render(); return; }
+  if(auto) return;         // تجربة تلقائية صامتة — قد يكون الرمز أطول من 4
+  tries++; pin = ''; drawDots();
+  if(tries >= 5){ $('#lockMsg').textContent = 'تجاوزت عدد المحاولات — انتظر 30 ثانية';
+    $('#pad').style.pointerEvents = 'none'; setTimeout(() => { tries = 0; $('#pad').style.pointerEvents = ''; $('#lockMsg').textContent = ''; }, 30000); return; }
+  $('#lockMsg').textContent = 'رمز غير صحيح — المحاولات المتبقية: ' + (5 - tries);
+}
+function lockNow(){ closeSheet(); pin = ''; drawDots(); $('#lock').classList.remove('hidden'); }
+
+function pinSheet(){
+  openSheet(`<h3>تغيير الرمز السري</h3><div class="hint">الرمز الافتراضي عند أول تشغيل هو 1234</div>
+    <label class="f"><span>الرمز الحالي</span><input class="in" id="p0" type="password" inputmode="numeric"></label>
+    <label class="f"><span>الرمز الجديد</span><input class="in" id="p1" type="password" inputmode="numeric"></label>
+    <label class="f"><span>تأكيد الرمز الجديد</span><input class="in" id="p2" type="password" inputmode="numeric"></label>
+    <button class="btn teal block" id="pSave">حفظ الرمز</button>`);
+  $('#pSave').onclick = async () => { const r = await api('/api/pin', {old:$('#p0').value, new:$('#p1').value, confirm:$('#p2').value});
+    if(!r.ok) return toast(r.error, true); toast(r.msg); closeSheet(); };
+}
+
+// ============================================================ التنقل
+const TABS = [['emp','الموظفون'],['rot','الوجبات'],['lv','الإجازات'],['hol','العطل'],['sched','الجدول'],['rep','التقارير']];
+function buildNav(){
+  $('#nav').innerHTML = TABS.map(([k,t]) => `<button data-t="${k}">${svg(k)}${t}</button>`).join('');
+  $('#nav').onclick = e => { const b = e.target.closest('button'); if(b){ TAB = b.dataset.t; render(); window.scrollTo(0,0);} };
+}
+async function load(){ const r = await api('/api/state'); if(r.ok) S = r; }
+function render(){
+  if(!S) return;
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.t === TAB));
+  const titles = {emp:'الموظفون', rot:'وجبات الخفر', lv:'الإجازات', hol:'العطل', sched:'جدول الدوام', rep:'التقارير'};
+  $('#title').textContent = titles[TAB];
+  const fab = $('#fab'); const fabFn = {emp:()=>empSheet(), rot:()=>linkSheet(), lv:()=>leaveSheet(), hol:()=>holSheet()}[TAB];
+  fab.classList.toggle('hidden', !fabFn); fab.onclick = fabFn;
+  $('#main').innerHTML = ({emp:vEmp, rot:vRot, lv:vLv, hol:vHol, sched:vSched, rep:vRep}[TAB])() + `<div class="credit">${esc(S.dev)} · جميع الحقوق محفوظة © 2026</div>`;
+  if(TAB === 'sched') drawSchedule();
+  if(TAB === 'rep') drawReport();
+}
+
+// ============================================================ الموظفون
+function vEmp(){
+  const n = S.employees.length, am = S.employees.filter(e => e.shift_type === 'صباحي').length;
+  const head = `<div class="sec-h"><div><h2>قائمة الموظفين</h2><p>${n} موظف · ${am} صباحي · ${n-am} خفر</p></div></div>`;
+  if(!n) return head + empty('emp', 'لا يوجد موظفون — اضغط + لإضافة موظف');
+  return head + S.employees.map(e => `<div class="card"><div class="row">${avatar(e.name, e.id)}
+    <div class="grow"><div class="name">${esc(e.name)}</div><div class="sub">${esc(e.position || '—')}</div></div>${shiftChip(e.shift_type)}</div>
+    <div class="kv"><span>تاريخ المباشرة: <b>${esc(e.hire_date || '—')}</b></span><span>الإضافة: <b>${esc(e.created_at || '—')}</b></span></div>
+    <div class="acts"><button class="btn sm amber" onclick="empSheet(${e.id})">تعديل</button>
+    <button class="btn sm rose" onclick="delEmp(${e.id})">حذف</button></div></div>`).join('');
+}
+function empSheet(id){
+  const e = id ? empById(id) : {name:'', position:'', shift_type:'صباحي', hire_date:S.system_start};
+  openSheet(`<h3>${id ? 'تعديل بيانات الموظف' : 'موظف جديد'}</h3>
+    <label class="f"><span>الاسم الثلاثي</span><input class="in" id="eN" value="${esc(e.name)}"></label>
+    <label class="f"><span>المنصب</span><input class="in" id="eP" value="${esc(e.position || '')}"></label>
+    <label class="f"><span>نوع الدوام</span><div class="seg" id="eS">
+      <button data-v="صباحي">☀ صباحي</button><button data-v="مسائي">☾ مسائي (خفر)</button></div></label>
+    <label class="f"><span>تاريخ المباشرة</span><input class="in" id="eH" type="date" value="${esc(e.hire_date || S.system_start)}"></label>
+    <div class="hint">ربط الخفر بوجبة تناوب يتم من قسم «الوجبات».</div>
+    <button class="btn teal block" id="eSave">${id ? 'تحديث البيانات' : 'حفظ الموظف'}</button>`);
+  let shift = e.shift_type || 'صباحي';
+  const seg = $('#eS'); const paint = () => seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === shift));
+  seg.onclick = ev => { const b = ev.target.closest('button'); if(b){ ev.preventDefault(); shift = b.dataset.v; paint(); } }; paint();
+  $('#eSave').onclick = () => act('/api/employee', {id, name:$('#eN').value, position:$('#eP').value, shift, hire_date:$('#eH').value}, () => { closeSheet(); render(); });
+}
+function delEmp(id){
+  const e = empById(id);
+  confirmBox('تأكيد الحذف', `سيتم حذف «${e.name}» مع كل إجازاته وفك ارتباط وجبته. متابعة؟`, 'حذف', () => act(`/api/employee/${id}/delete`, {}, render));
+}
+
+// ============================================================ الوجبات
+function vRot(){
+  const head = `<div class="sec-h"><div><h2>وجبات الخفر</h2><p>الأول يداوم أيام الوجبة ثم ينزل وتبدأ وجبة الثاني</p></div></div>`;
+  if(!S.rotation.length) return head + empty('rot', 'لا يوجد موظفون بدوام مسائي (خفر)');
+  const seen = new Set(); let out = '';
+  for(const r of S.rotation){
+    if(seen.has(r.id)) continue; seen.add(r.id);
+    const e = empById(r.id);
+    if(!r.backup){
+      out += `<div class="card"><div class="row">${avatar(r.name, r.id)}<div class="grow"><div class="name">${esc(r.name)}</div>
+        <div class="sub">بدون بديل — يداوم كل يوم عدا الجمعة والسبت</div></div>${stChip(r.status)}</div></div>`;
+      continue;
+    }
+    const b = S.rotation.find(x => x.id === e.backup_id); if(b) seen.add(b.id);
+    const firstIsE = (e.rotation_order || 0) === 0;
+    const A = firstIsE ? r : b, B = firstIsE ? b : r;
+    out += `<div class="card"><div class="row"><div class="grow"><div class="name">وجبة ${esc(r.days)} يوم</div>
+      <div class="sub">بدء التناوب: ${esc(r.start)}</div></div></div>
+      <div class="pair"><div><div class="n">${esc(A.name)}</div><div class="sub" style="margin-bottom:6px">يبدأ أولاً</div>${stChip(A.status)}</div>
+      <div class="swap"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">${ICON.rot}</svg></div>
+      <div><div class="n">${esc(B.name)}</div><div class="sub" style="margin-bottom:6px">البديل</div>${stChip(B.status)}</div></div>
+      <div class="acts"><button class="btn sm" onclick="rotEdit(${r.id})">تعديل الوجبة</button>
+      <button class="btn sm amber" onclick="act('/api/rotation/${r.id}/flip',{},render)">عكس الترتيب</button>
+      <button class="btn sm rose" onclick="rotUnlink(${r.id})">فك الارتباط</button></div></div>`;
+  }
+  return head + `<div class="hint">الحالة المعروضة هي حالة اليوم (${esc(S.today)}). إجازة الخفر تُحسب له وحده، وبديله يبقى في النزول ولا يُستدعى للدوام.</div>` + out;
+}
+function evOpts(sel){ return S.employees.filter(e => e.shift_type === 'مسائي').map(e => `<option value="${e.id}" ${e.id == sel ? 'selected' : ''}>${esc(e.name)}</option>`).join(''); }
+function linkSheet(){
+  if(S.employees.filter(e => e.shift_type === 'مسائي').length < 2) return toast('يجب وجود موظفَين بدوام مسائي على الأقل', true);
+  openSheet(`<h3>ربط وجبة تناوب</h3><div class="hint">للخفر (المسائي) فقط · دوام كل منهما عكس الآخر تماماً</div>
+    <label class="f"><span>الخفر الأول (يبدأ أولاً)</span><select class="in" id="rA"><option value="">— اختر —</option>${evOpts()}</select></label>
+    <label class="f"><span>الخفر الثاني (بديله)</span><select class="in" id="rB"><option value="">— اختر —</option>${evOpts()}</select></label>
+    <div class="two"><label class="f"><span>أيام الوجبة</span><input class="in" id="rD" type="number" min="1" max="90" value="10" inputmode="numeric"></label>
+    <label class="f"><span>تاريخ بدء التناوب</span><input class="in" id="rS" type="date" value="${S.system_start}"></label></div>
+    <button class="btn block" id="rSave">ربط الوجبة</button>`);
+  $('#rSave').onclick = () => act('/api/link', {first:+$('#rA').value || null, second:+$('#rB').value || null, days:$('#rD').value, start:$('#rS').value}, () => { closeSheet(); render(); });
+}
+function rotEdit(id){
+  const e = empById(id);
+  openSheet(`<h3>تعديل الوجبة</h3>
+    <div class="two"><label class="f"><span>أيام الوجبة</span><input class="in" id="rD" type="number" min="1" max="90" value="${esc(e.rotation_days || 10)}" inputmode="numeric"></label>
+    <label class="f"><span>تاريخ بدء التناوب</span><input class="in" id="rS" type="date" value="${esc(e.rotation_start || S.system_start)}"></label></div>
+    <button class="btn block" id="rSave">حفظ التعديل</button>`);
+  $('#rSave').onclick = () => act(`/api/rotation/${id}/edit`, {days:$('#rD').value, start:$('#rS').value}, () => { closeSheet(); render(); });
+}
+function rotUnlink(id){ confirmBox('فك الارتباط', 'فك ارتباط الوجبة بين هذا الخفر وبديله؟', 'فك الارتباط', () => act(`/api/rotation/${id}/unlink`, {}, render)); }
+
+// ============================================================ الإجازات
+const LV_TYPES = ['إجازة اعتيادية','إجازة زمنية','إجازة مرضية','إجازة اضطرارية'];
+function vLv(){
+  const head = `<div class="sec-h"><div><h2>سجل الإجازات</h2><p>${S.leaves.length} إجازة مسجّلة</p></div></div>`;
+  if(!S.leaves.length) return head + empty('lv', 'لا توجد إجازات — اضغط + لتسجيل إجازة');
+  return head + S.leaves.map(l => `<div class="card"><div class="row">${avatar(l.name, l.employee_id)}
+    <div class="grow"><div class="name">${esc(l.name)}</div><div class="sub">${esc(l.leave_type)}</div></div>
+    <span class="chip st-leave">${l.days} يوم</span></div>
+    <div class="kv"><span>من <b>${esc(l.start_date)}</b></span><span>إلى <b>${esc(l.end_date)}</b></span>${shiftChip(l.shift_type)}</div>
+    ${l.notes ? `<div class="sub" style="margin-top:8px">📝 ${esc(l.notes)}</div>` : ''}
+    <div class="acts"><button class="btn sm amber" onclick="leaveSheet(${l.id})">تعديل</button>
+    <button class="btn sm rose" onclick="delLeave(${l.id})">حذف</button></div></div>`).join('');
+}
+function leaveSheet(id){
+  if(!S.employees.length) return toast('أضف موظفاً أولاً', true);
+  const l = id ? S.leaves.find(x => x.id === id) : {employee_id:'', leave_type:LV_TYPES[0], start_date:S.today, end_date:S.today, notes:''};
+  openSheet(`<h3>${id ? 'تعديل الإجازة' : 'تسجيل إجازة'}</h3>
+    <label class="f"><span>الموظف</span><select class="in" id="lE"><option value="">— اختر —</option>
+      ${S.employees.map(e => `<option value="${e.id}" ${e.id == l.employee_id ? 'selected' : ''}>${esc(e.name)} (${esc(e.shift_type)})</option>`).join('')}</select></label>
+    <label class="f"><span>نوع الإجازة</span><select class="in" id="lT">${LV_TYPES.map(t => `<option ${t === l.leave_type ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+    <div class="two"><label class="f"><span>من تاريخ</span><input class="in" id="lS" type="date" value="${esc(l.start_date)}"></label>
+    <label class="f"><span>إلى تاريخ</span><input class="in" id="lX" type="date" value="${esc(l.end_date)}"></label></div>
+    <div class="hint" id="lDays"></div>
+    <label class="f"><span>ملاحظات</span><input class="in" id="lN" value="${esc(l.notes || '')}"></label>
+    <button class="btn teal block" id="lSave">${id ? 'حفظ التعديل' : 'تسجيل الإجازة'}</button>`);
+  const upd = () => { const a = new Date($('#lS').value), b = new Date($('#lX').value);
+    const n = Math.round((b - a) / 864e5) + 1; $('#lDays').textContent = isNaN(n) ? '' : n < 1 ? '⚠ تاريخ النهاية قبل البداية' : `عدد الأيام: ${n} — إجازة الخفر تُحسب له وحده وبديله يبقى في النزول`; };
+  $('#lS').onchange = () => { if($('#lX').value < $('#lS').value) $('#lX').value = $('#lS').value; upd(); }; $('#lX').onchange = upd; upd();
+  $('#lSave').onclick = () => act('/api/leave', {id, employee_id:+$('#lE').value || null, type:$('#lT').value, start:$('#lS').value, end:$('#lX').value, notes:$('#lN').value}, () => { closeSheet(); render(); });
+}
+function delLeave(id){ confirmBox('تأكيد', 'حذف هذه الإجازة؟', 'حذف', () => act(`/api/leave/${id}/delete`, {}, render)); }
+
+// ============================================================ العطل
+function vHol(){
+  const head = `<div class="sec-h"><div><h2>قائمة العطل</h2><p>العطلة تُستثنى من الدوام الصباحي · الخفر يداوم فيها</p></div>
+    ${S.holidays.length ? `<button class="btn sm ghost" onclick="clearHol()">تفريغ القائمة</button>` : ''}</div>`;
+  if(!S.holidays.length) return head + empty('hol', 'القائمة فارغة — اضغط + لإضافة عطلة');
+  return head + S.holidays.map(h => { const d = new Date(h.date + 'T00:00');
+    return `<div class="card"><div class="row"><div class="av" style="background:${h.holiday_type === 'رسمي' ? '#d97706' : '#64748b'};flex-direction:column;font-size:16px;line-height:1">${d.getDate()}<small style="font-size:9px;font-weight:700">${AR_MONTHS[d.getMonth()].split(' ')[0]}</small></div>
+    <div class="grow"><div class="name">${esc(h.holiday_name)}</div><div class="sub">${esc(h.date)} · ${esc(h.holiday_type)}</div></div>
+    <button class="btn sm rose" onclick="delHol(${h.id})">حذف</button></div></div>`; }).join('');
+}
+function holSheet(){
+  openSheet(`<h3>إضافة عطلة</h3>
+    <label class="f"><span>التاريخ</span><input class="in" id="hD" type="date" value="${S.today}"></label>
+    <label class="f"><span>اسم العطلة</span><input class="in" id="hN"></label>
+    <label class="f"><span>نوع العطلة</span><div class="seg" id="hT"><button data-v="رسمي" class="on">رسمي</button><button data-v="غير رسمي">غير رسمي</button></div></label>
+    <button class="btn teal block" id="hSave">إضافة العطلة</button>`);
+  let t = 'رسمي';
+  $('#hT').onclick = ev => { const b = ev.target.closest('button'); if(!b) return; ev.preventDefault(); t = b.dataset.v; $('#hT').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
+  $('#hSave').onclick = () => act('/api/holiday', {date:$('#hD').value, name:$('#hN').value, type:t}, () => { closeSheet(); render(); });
+}
+function delHol(id){ confirmBox('تأكيد', 'حذف هذه العطلة؟', 'حذف', () => act(`/api/holiday/${id}/delete`, {}, render)); }
+function clearHol(){ confirmBox('تأكيد', 'سيتم حذف جميع العطل المسجّلة. متابعة؟', 'حذف الكل', () => act('/api/holidays/clear', {}, render)); }
+
+// ============================================================ جدول الدوام
+function vSched(){
+  if(!S.employees.length) return empty('sched', 'أضف موظفاً أولاً');
+  if(!view.sched){ const t = new Date(S.today < S.system_start ? S.system_start : S.today); view.sched = {emp:S.employees[0].id, y:t.getFullYear(), m:t.getMonth() + 1}; }
+  if(!empById(view.sched.emp)) view.sched.emp = S.employees[0].id;
+  const v = view.sched;
+  return `<div class="card"><label class="f" style="margin-bottom:10px"><span>الموظف</span><select class="in" id="scE">
+    ${S.employees.map(e => `<option value="${e.id}" ${e.id == v.emp ? 'selected' : ''}>${esc(e.name)} (${esc(e.shift_type)})</option>`).join('')}</select></label>
+    <div class="mnav"><button id="scPrev"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg></button>
+    <div class="lbl" id="scLbl"></div>
+    <button id="scNext"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg></button></div>
+    <div id="scCal"></div></div><div id="scSum"></div><div class="card daylist" id="scList"></div>`;
+}
+async function drawSchedule(){
+  const v = view.sched;
+  $('#scE').onchange = e => { v.emp = +e.target.value; drawSchedule(); };
+  $('#scPrev').onclick = () => { v.m--; if(v.m < 1){ v.m = 12; v.y--; } drawSchedule(); };
+  $('#scNext').onclick = () => { v.m++; if(v.m > 12){ v.m = 1; v.y++; } drawSchedule(); };
+  $('#scLbl').textContent = `${AR_MONTHS[v.m - 1]} ${v.y}`;
+  const r = await api(`/api/schedule?emp=${v.emp}&y=${v.y}&m=${v.m}`);
+  if(!r.ok) return toast(r.error, true);
+  // التقويم: الأسبوع يبدأ بالسبت
+  const heads = ['سبت','أحد','إثنين','ثلاثاء','أربعاء','خميس','جمعة'];
+  const lead = (r.first_weekday + 2) % 7;
+  let cal = heads.map(h => `<div class="h">${h}</div>`).join('') + '<div></div>'.repeat(lead);
+  const SHORT = {'دوام':'دوام','نزول':'نزول','إجازة':'إجازة','عطلة رسمية':'عطلة','عطلة أسبوعية':'—'};
+  for(const d of r.rows){ cal += `<div class="d st-${ST[d.status] || 'off'} ${d.date === S.today ? 'today' : ''}">${+d.date.slice(8)}<small>${SHORT[d.status]}</small></div>`; }
+  $('#scCal').innerHTML = `<div class="cal">${cal}</div><div class="legend">
+    <span><i style="background:var(--s-duty)"></i>دوام</span><span><i style="background:var(--s-off)"></i>نزول</span><span><i style="background:#f8fafc;border:1px solid #e2e8f0"></i>عطلة أسبوعية</span>
+    <span><i style="background:var(--s-leave)"></i>إجازة</span><span><i style="background:var(--s-hol)"></i>عطلة رسمية</span></div>`;
+  const s = r.summary;
+  $('#scSum').innerHTML = `<div class="stats">
+    <div class="stat" style="--c:#334155"><b>${s.sched}</b><span>الدوام المقرر</span></div>
+    <div class="stat" style="--c:#be123c"><b>${s.leave}</b><span>إجازة (يُخصم)</span></div>
+    <div class="stat" style="--c:#0d9488"><b>${s.duty}</b><span>صافي الدوام</span></div>
+    <div class="stat" style="--c:#64748b"><b>${s.off}</b><span>نزول</span></div>
+    <div class="stat" style="--c:#d97706"><b>${s.holiday}</b><span>عطل رسمية</span></div>
+    <div class="stat" style="--c:#7c3aed"><b>${s.weekend}</b><span>عطل أسبوعية</span></div></div>`;
+  $('#scList').innerHTML = r.rows.filter(d => d.detail !== '—' || d.status === 'إجازة').map(d =>
+    `<div class="it"><span class="dt">${d.date.slice(5)} ${esc(d.day_name)}</span>${stChip(d.status)}<span class="grow sub" style="margin:0">${esc(d.detail)}</span></div>`).join('')
+    || '<div class="sub" style="text-align:center;padding:8px">لا توجد إجازات أو عطل في هذا الشهر</div>';
+}
+
+// ============================================================ التقارير
+function vRep(){
+  if(!view.rep){ const y = +S.system_start.slice(0,4); view.rep = {emp:0, from:S.system_start, to:`${y}-12-31`}; }
+  const v = view.rep;
+  return `<div class="card"><label class="f"><span>الموظف</span><select class="in" id="rpE"><option value="0">— جميع الموظفين —</option>
+    ${S.employees.map(e => `<option value="${e.id}" ${e.id == v.emp ? 'selected' : ''}>${esc(e.name)} (${esc(e.shift_type)})</option>`).join('')}</select></label>
+    <div class="two"><label class="f"><span>من تاريخ</span><input class="in" id="rpF" type="date" value="${v.from}"></label>
+    <label class="f"><span>إلى تاريخ</span><input class="in" id="rpT" type="date" value="${v.to}"></label></div>
+    <div class="two"><button class="btn ghost" id="rpYear">السنة الحالية</button><button class="btn" id="rpGo">عرض التقرير</button></div></div>
+    <div id="rpOut"></div>`;
+}
+async function drawReport(){
+  const v = view.rep;
+  $('#rpGo').onclick = () => { v.emp = +$('#rpE').value; v.from = $('#rpF').value; v.to = $('#rpT').value; drawReport(); };
+  $('#rpYear').onclick = () => { const y = +S.system_start.slice(0,4); $('#rpF').value = S.system_start; $('#rpT').value = `${y}-12-31`; $('#rpGo').click(); };
+  const r = await api(`/api/report?emp=${v.emp}&from=${v.from}&to=${v.to}`);
+  const out = $('#rpOut'); if(!out) return;
+  if(!r.ok){ out.innerHTML = empty('rep', r.error); return; }
+  const s = r.stats;
+  let html = `<div class="eq"><span>المقرر ${s.sched}</span><span class="op">−</span><span style="color:var(--rose)">إجازة ${s.leave}</span><span class="op">=</span><span style="color:var(--teal)">صافي الدوام ${s.duty}</span></div>
+    <div class="stats">
+    <div class="stat" style="--c:#334155"><b>${s.sched}</b><span>الدوام المقرر</span></div>
+    <div class="stat" style="--c:#be123c"><b>${s.leave}</b><span>يُخصم إجازة −</span></div>
+    <div class="stat" style="--c:#0d9488"><b>${s.duty}</b><span>صافي الدوام =</span></div>
+    <div class="stat" style="--c:#64748b"><b>${s.off}</b><span>أيام النزول</span></div>
+    <div class="stat" style="--c:#d97706"><b>${s.count}</b><span>عدد الإجازات</span></div>
+    <div class="stat" style="--c:#7c3aed"><b>${s.hol}</b><span>أيام العطل</span></div></div>`;
+  if(r.mode === 'all'){
+    html += `<div class="sec-h"><div><h2>جميع الموظفين</h2><p>صافي الدوام = الدوام المقرر − أيام الإجازة</p></div></div>` +
+      r.rows.map((x, i) => `<div class="card"><div class="row">${avatar(x.name, i + 1)}<div class="grow"><div class="name">${esc(x.name)}</div>
+      <div class="sub">${x.backup ? 'البديل: ' + esc(x.backup) : 'بدون بديل'}</div></div>${shiftChip(x.shift)}</div>
+      <table class="mini" style="margin-top:10px"><tr><th>مقرر</th><th>إجازة</th><th>صافي</th><th>نزول</th><th>إجازات</th><th>عطل</th></tr>
+      <tr><td>${x.sched}</td><td style="color:var(--rose);font-weight:800">${x.leave}</td><td style="color:var(--teal);font-weight:800">${x.duty}</td><td>${x.off}</td><td>${x.count}</td><td>${x.hol}</td></tr></table></div>`).join('');
+  } else {
+    html += `<div class="card"><div class="sec-h" style="margin-top:0"><div><h2 style="font-size:16px">التوزيع الشهري</h2><p>${esc(r.name)}</p></div></div>
+      <table class="mini"><tr><th>الشهر</th><th>مقرر</th><th>إجازة</th><th>صافي</th><th>نزول</th></tr>
+      ${r.months.map(m => `<tr><td>${AR_MONTHS[+m.month.slice(5) - 1]} ${m.month.slice(0,4)}</td><td>${m.sched}</td><td style="color:var(--rose);font-weight:800">${m.leave}</td><td style="color:var(--teal);font-weight:800">${m.duty}</td><td>${m.off}</td></tr>`).join('')}</table></div>
+      <div class="card"><div class="sec-h" style="margin-top:0"><div><h2 style="font-size:16px">إجازات الموظف خلال المدة</h2></div></div>
+      ${r.leaves.length ? `<table class="mini"><tr><th>النوع</th><th>من</th><th>إلى</th><th>الأيام</th></tr>
+      ${r.leaves.map(l => `<tr><td>${esc(l.type)}</td><td>${esc(l.start.slice(5))}</td><td>${esc(l.end.slice(5))}</td><td style="font-weight:800">${l.days}</td></tr>`).join('')}</table>`
+      : '<div class="sub" style="text-align:center;padding:8px">لا توجد إجازات</div>'}</div>`;
+  }
+  out.innerHTML = html;
+}
+
+// ============================================================ البدء
+(async function init(){
+  buildLock(); buildNav();
+  await load();
+  if(S){ $('#lockMark').textContent = S.dev + ' · 2026';
+    const t = new Date(S.today + 'T00:00'); $('#today').textContent = `${t.getDate()} ${AR_MONTHS[t.getMonth()]} ${t.getFullYear()}`; }
+  // زر الرجوع في أندرويد يغلق النافذة المفتوحة أولاً
+  history.pushState(null, ''); window.addEventListener('popstate', () => {
+    if($('#sheet').classList.contains('on')) closeSheet(); else if(TAB !== 'emp'){ TAB = 'emp'; render(); }
+    history.pushState(null, ''); });
+})();
+</script>
+</body>
+</html>
