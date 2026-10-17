@@ -43,6 +43,12 @@ jobs:
           key: buildozer-book-archive-${{ hashFiles('buildozer.spec') }}
           restore-keys: buildozer-
 
+      - name: Use the permanent signing key
+        # مفتاح ثابت لكل البناءات — بدونه لا يقبل أندرويد تثبيت التحديث فوق النسخة القديمة
+        run: |
+          mkdir -p ~/.android
+          cp signing/debug.keystore ~/.android/debug.keystore
+
       - name: Build APK
         run: |
           yes | buildozer -v android debug 2>&1 | tee build.log

@@ -4,7 +4,8 @@ package.name = bookarchive
 package.domain = org.omar
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,ttf
-version = 1.2
+source.exclude_dirs = signing,.github,bin,.buildozer
+version = 1.3
 
 icon.filename = %(source.dir)s/icon.png
 presplash.filename = %(source.dir)s/presplash.png

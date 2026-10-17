@@ -65,6 +65,15 @@ def ar(text):
     return t
 
 
+def ar_lines(text, width=34):
+    """نص عربي متعدد الأسطر: تقسيم يدوي ثم معالجة كل سطر وحده حتى لا ينعكس ترتيب الأسطر."""
+    import textwrap
+    out = []
+    for para in str(text or '').split('\n'):
+        out.extend(textwrap.wrap(para, width) or [''])
+    return '\n'.join(ar(l) for l in out)
+
+
 def show_toast(msg):
     # التوست على أندرويد أصلي ويعرض العربي بدون معالجة
     toast(msg if platform == 'android' else ar(msg))
@@ -912,6 +921,9 @@ KV = r'''
                 pos: self.pos
                 size: self.size
         TopBar:
+            WhiteIcon:
+                icon: 'backup-restore'
+                on_release: app.backup_menu()
             BarTitle:
                 text: app.ar('أرشيف الكتب')
             MDIcon:
@@ -1297,7 +1309,7 @@ class ArchiveApp(MDApp):
         def go(*a):
             dlg.dismiss()
             on_ok()
-        dlg = MDDialog(title=ar(title), text=ar(text), buttons=[
+        dlg = MDDialog(title=ar(title), text=ar_lines(text), buttons=[
             MDFlatButton(text=ar('إلغاء'), on_release=lambda *a: dlg.dismiss()),
             MDRaisedButton(text=ar(ok_text), md_bg_color=self.c_red, on_release=go)])
         self._align_dialog(dlg)
@@ -1314,6 +1326,10 @@ class ArchiveApp(MDApp):
             self._desktop_picker(screen, mode)
 
     def _on_chosen(self, uri_list):
+        if uri_list and getattr(self, '_pick_mode', '') == 'restore':
+            self._pick_mode = ''
+            threading.Thread(target=self._fetch_restore, args=(uri_list[0],), daemon=True).start()
+            return
         if uri_list and self._pick_screen is not None:
             self._run_import(self._pick_screen, uris=uri_list,
                              mode=getattr(self, '_pick_mode', 'img'))
@@ -1321,14 +1337,15 @@ class ArchiveApp(MDApp):
     def _desktop_picker(self, screen, mode='img'):
         from kivy.uix.popup import Popup
         from kivy.uix.filechooser import FileChooserIconView
-        exts = IMG_EXTS if mode == 'img' else tuple(DOC_EXTS)
+        exts = {'img': IMG_EXTS, 'restore': ('.zip',)}.get(mode, tuple(DOC_EXTS))
         pats = ['*' + e for e in exts]
-        fc = FileChooserIconView(path=os.path.expanduser('~'), multiselect=True,
+        fc = FileChooserIconView(path=os.path.expanduser('~'), multiselect=(mode != 'restore'),
                                  filters=pats + [p.upper() for p in pats])
         lay = BoxLayout(orientation='vertical', spacing=dp(6))
         lay.add_widget(fc)
         row = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(8))
-        pop = Popup(title=ar('اختر الصور' if mode == 'img' else 'اختر ملفات Word أو PDF'),
+        pop = Popup(title=ar({'img': 'اختر الصور', 'restore': 'اختر ملف النسخة الاحتياطية'}
+                             .get(mode, 'اختر ملفات Word أو PDF')),
                     title_align='right', content=lay,
                     size_hint=(.95, .95))
 
@@ -1336,7 +1353,10 @@ class ArchiveApp(MDApp):
             sel = list(fc.selection)
             pop.dismiss()
             if sel:
-                self._run_import(screen, paths=sel, mode=mode)
+                if mode == 'restore':
+                    self._ask_restore(sel[0], temp=False)
+                else:
+                    self._run_import(screen, paths=sel, mode=mode)
         row.add_widget(MDFlatButton(text=ar('إلغاء'), on_release=lambda *a: pop.dismiss()))
         row.add_widget(MDRaisedButton(text=ar('إضافة المحدد'), on_release=ok))
         lay.add_widget(row)
@@ -1451,6 +1471,200 @@ class ArchiveApp(MDApp):
                 pass
         cache[path] = uri
         return uri
+
+    # ---- النسخ الاحتياطي والاستعادة
+    def backup_menu(self):
+        def go(fn):
+            dlg.dismiss()
+            fn()
+        dlg = MDDialog(
+            title=ar('النسخ الاحتياطي'),
+            text=ar_lines('احفظ كل الدوائر والكتب والصور والملفات في ملف واحد، '
+                          'واحتفظ به خارج الهاتف (واتساب أو Drive).\n'
+                          'الاستعادة تستبدل البيانات الحالية بمحتوى النسخة.'),
+            buttons=[
+                MDFlatButton(text=ar('استعادة نسخة'), on_release=lambda *a: go(self.pick_restore)),
+                MDRaisedButton(text=ar('إنشاء نسخة احتياطية'), md_bg_color=self.c_violet,
+                               on_release=lambda *a: go(self.make_backup))])
+        self._align_dialog(dlg)
+        dlg.open()
+
+    def make_backup(self):
+        show_toast('جاري إنشاء النسخة الاحتياطية...')
+        threading.Thread(target=self._backup_worker, daemon=True).start()
+
+    def _backup_worker(self):
+        import zipfile
+        uri, err, out = None, None, None
+        tmp_dir = os.path.join(self.user_data_dir, 'backup_tmp')
+        try:
+            os.makedirs(tmp_dir, exist_ok=True)
+            stamp = datetime.now().strftime('%Y-%m-%d_%H%M')
+            out = os.path.join(tmp_dir, 'BookArchive-backup_%s.zip' % stamp)
+            snap = os.path.join(tmp_dir, 'archive.db')
+            # نسخة متسقة من قاعدة البيانات حتى لو كانت مفتوحة
+            src = sqlite3.connect(os.path.join(self.user_data_dir, 'archive.db'))
+            dst = sqlite3.connect(snap)
+            src.backup(dst)
+            dst.close()
+            src.close()
+            with zipfile.ZipFile(out, 'w') as z:
+                z.write(snap, 'archive.db', compress_type=zipfile.ZIP_DEFLATED)
+                for n in sorted(os.listdir(self.img_dir)):
+                    z.write(os.path.join(self.img_dir, n), 'images/' + n,
+                            compress_type=zipfile.ZIP_STORED)
+            os.remove(snap)
+            if platform == 'android':
+                uri = SharedStorage().copy_to_shared(out)
+                if not uri:
+                    raise RuntimeError('copy_to_shared failed')
+            else:
+                import shutil
+                final = os.path.join(os.path.expanduser('~'), os.path.basename(out))
+                shutil.copyfile(out, final)
+                out = final
+        except Exception as e:
+            err = str(e)
+            print('backup failed:', e)
+        finally:
+            if platform == 'android':
+                try:
+                    if out and os.path.exists(out):
+                        os.remove(out)
+                except OSError:
+                    pass
+                try:
+                    from jnius import detach
+                    detach()
+                except Exception:
+                    pass
+        Clock.schedule_once(lambda dt: self._backup_done(err, uri, out))
+
+    def _backup_done(self, err, uri, path):
+        if err:
+            show_toast('تعذر إنشاء النسخة الاحتياطية')
+            return
+        where = ('مجلد Documents' if platform == 'android' else path)
+        buttons = [MDFlatButton(text=ar('تم'), on_release=lambda *a: dlg.dismiss())]
+        if uri is not None:
+            def share(*a):
+                dlg.dismiss()
+                try:
+                    from androidstorage4kivy import ShareSheet
+                    ShareSheet().share_file(uri)
+                except Exception as e:
+                    print('share failed:', e)
+                    show_toast('تعذرت المشاركة')
+            buttons.insert(0, MDRaisedButton(text=ar('مشاركة النسخة'), md_bg_color=self.c_violet,
+                                             on_release=share))
+        dlg = MDDialog(title=ar('تم حفظ النسخة الاحتياطية'),
+                       text=ar_lines('حُفظت في: ' + where + '\nيُفضّل إرسالها إلى واتساب أو Drive '
+                                     'للاحتفاظ بها خارج الهاتف.'),
+                       buttons=buttons)
+        self._align_dialog(dlg)
+        dlg.open()
+
+    def pick_restore(self):
+        self._pick_mode = 'restore'
+        if platform == 'android':
+            self.chooser.choose_content('*/*', multiple=False)
+        else:
+            self._desktop_picker(None, 'restore')
+
+    def _fetch_restore(self, uri):
+        path = None
+        try:
+            path = SharedStorage().copy_from_shared(uri)
+        except Exception as e:
+            print('restore copy failed:', e)
+        finally:
+            try:
+                from jnius import detach
+                detach()
+            except Exception:
+                pass
+        Clock.schedule_once(lambda dt: self._ask_restore(path, temp=True))
+
+    def _ask_restore(self, path, temp):
+        import zipfile
+        ok = False
+        try:
+            with zipfile.ZipFile(path) as z:
+                ok = 'archive.db' in z.namelist()
+        except Exception:
+            ok = False
+        if not ok:
+            if temp and path:
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+            show_toast('هذا ليس ملف نسخة احتياطية لأرشيف الكتب')
+            return
+
+        def cancel():
+            if temp:
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+
+        def go(*a):
+            dlg.dismiss()
+            self._do_restore(path, temp)
+
+        def no(*a):
+            dlg.dismiss()
+            cancel()
+        dlg = MDDialog(title=ar('استعادة النسخة الاحتياطية؟'),
+                       text=ar_lines('سيتم استبدال كل البيانات الحالية بمحتوى النسخة.'),
+                       buttons=[MDFlatButton(text=ar('إلغاء'), on_release=no),
+                                MDRaisedButton(text=ar('استعادة'), md_bg_color=self.c_red,
+                                               on_release=go)])
+        self._align_dialog(dlg)
+        dlg.open()
+
+    def _do_restore(self, path, temp):
+        import zipfile
+        import shutil
+        work = os.path.join(self.user_data_dir, 'restore_tmp')
+        db_path = os.path.join(self.user_data_dir, 'archive.db')
+        try:
+            shutil.rmtree(work, ignore_errors=True)
+            os.makedirs(os.path.join(work, 'images'))
+            with zipfile.ZipFile(path) as z:
+                for n in z.namelist():
+                    base = os.path.basename(n)
+                    if n == 'archive.db':
+                        z.extract(n, work)
+                    elif n.startswith('images/') and base and '..' not in n:
+                        with z.open(n) as srcf, open(os.path.join(work, 'images', base), 'wb') as dstf:
+                            shutil.copyfileobj(srcf, dstf)
+            # التحقق من أن القاعدة سليمة قبل الاستبدال
+            chk = sqlite3.connect(os.path.join(work, 'archive.db'))
+            chk.execute('SELECT COUNT(*) FROM depts').fetchone()
+            chk.close()
+            self.db.con.close()
+            if os.path.exists(db_path):
+                shutil.copyfile(db_path, db_path + '.before_restore')
+            shutil.move(os.path.join(work, 'archive.db'), db_path)
+            shutil.rmtree(self.img_dir, ignore_errors=True)
+            shutil.move(os.path.join(work, 'images'), self.img_dir)
+            show_toast('تمت الاستعادة بنجاح')
+        except Exception as e:
+            print('restore failed:', e)
+            show_toast('تعذرت الاستعادة — الملف تالف')
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+            if temp:
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+            os.makedirs(self.img_dir, exist_ok=True)
+            self.db = DB(db_path)
+            self.root.get_screen('depts').refresh()
+            self.switch('depts', forward=False)
 
 
 if __name__ == '__main__':
