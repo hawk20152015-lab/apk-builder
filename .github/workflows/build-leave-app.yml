@@ -42,6 +42,12 @@ jobs:
           key: android-sdk-leave-app-${{ hashFiles('buildozer.spec') }}
           restore-keys: android-sdk-
 
+      - name: Use the permanent signing key
+        # مفتاح ثابت لكل البناءات — بدونه لا يقبل أندرويد تثبيت التحديث فوق النسخة القديمة
+        run: |
+          mkdir -p ~/.android
+          cp signing/debug.keystore ~/.android/debug.keystore
+
       - name: Build APK
         run: |
           yes | buildozer -v android debug 2>&1 | tee build.log
