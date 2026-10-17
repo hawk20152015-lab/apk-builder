@@ -42,17 +42,18 @@ jobs:
           key: android-sdk-leave-app-${{ hashFiles('buildozer.spec') }}
           restore-keys: android-sdk-
 
-      - name: Use the permanent signing key
-        # مفتاح ثابت لكل البناءات — بدونه لا يقبل أندرويد تثبيت التحديث فوق النسخة القديمة
-        run: |
-          mkdir -p ~/.android
-          cp signing/debug.keystore ~/.android/debug.keystore
-
       - name: Build APK
         run: |
           yes | buildozer -v android debug 2>&1 | tee build.log
           test -n "$(ls bin/*.apk 2>/dev/null)" || { echo "::error::Build failed"; tail -n 120 build.log; exit 1; }
-          cp bin/*.apk "LeaveApp-v$(grep '^version' buildozer.spec | cut -d= -f2 | tr -d ' ').apk"
+          OUT="LeaveApp-v$(grep '^version' buildozer.spec | cut -d= -f2 | tr -d ' ').apk"
+          # إعادة التوقيع بالمفتاح الثابت حتى تُثبَّت التحديثات فوق النسخة القديمة
+          SIGNER=$(ls -d ~/.buildozer/android/platform/android-sdk/build-tools/*/apksigner | sort -V | tail -1)
+          "$SIGNER" sign --ks signing/debug.keystore --ks-pass pass:android \
+            --ks-key-alias androiddebugkey --key-pass pass:android --out "$OUT" bin/*.apk
+          "$SIGNER" verify --print-certs "$OUT" | tee certs.txt
+          grep -qi "05f968ff2f2a58d8774532bb11d710dae53c15412254afe47d61d943ebe7d5e4" certs.txt \
+            || { echo "::error::APK is not signed with the permanent key"; exit 1; }
 
       - uses: actions/upload-artifact@v4
         if: always()

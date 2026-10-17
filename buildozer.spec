@@ -5,7 +5,7 @@ package.domain = org.omarkarim
 source.dir = .
 source.include_exts = py,png,html
 source.exclude_dirs = .git,.github,bin,.buildozer,__pycache__,signing
-version = 3.2
+version = 3.3
 
 requirements = python3,flask==2.0.3,werkzeug==2.0.3,jinja2==3.0.3,itsdangerous==2.0.1,click==8.0.4,markupsafe==2.0.1
 
