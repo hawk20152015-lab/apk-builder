@@ -21,7 +21,7 @@ from core import DB, KINDS, KIND_LABEL, TRANSFERRED, DEV_MARK
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.environ.get('ANDROID_PRIVATE') or HERE
 DB_PATH = os.path.join(DATA_DIR, 'fund.db')
-VERSION = '2.0'
+VERSION = '2.1'
 
 db = DB(DB_PATH)
 app = Flask(__name__)

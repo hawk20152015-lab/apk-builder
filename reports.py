@@ -26,6 +26,10 @@ KIND_COLOR = {'add': (13, 148, 136), 'nathriya': (225, 29, 72), 'spend': (217, 1
 GOLD = (212, 160, 23)
 
 _fonts = {}
+# Pillow على أندرويد 8.4 (LAYOUT_BASIC) — والإصدارات الأحدث (Layout.BASIC)
+_BASIC = getattr(getattr(ImageFont, 'Layout', None), 'BASIC', None)
+if _BASIC is None:
+    _BASIC = ImageFont.LAYOUT_BASIC
 
 
 def font(size, bold=False):
@@ -33,8 +37,7 @@ def font(size, bold=False):
     if k not in _fonts:
         # BASIC دائماً: النص يُشكَّل ويُرتَّب مسبقاً بـ arabic_reshaper + bidi،
         # و raqm (إن وُجد على الحاسبة) سيعكسه مرة ثانية
-        _fonts[k] = ImageFont.truetype(F_BOLD if bold else F_REG, size,
-                                       layout_engine=ImageFont.Layout.BASIC)
+        _fonts[k] = ImageFont.truetype(F_BOLD if bold else F_REG, size, layout_engine=_BASIC)
     return _fonts[k]
 
 
